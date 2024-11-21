@@ -182,7 +182,7 @@ static void calcular_hash(GtkWidget *widget, gpointer data) {
       *hashOriginal = hash; // Guardar el hash original
       *tipoMimeOriginal = tipoMimeActual; // Guardar el tipo MIME original
       *primerHash = true;
-      gtk_button_set_label(GTK_BUTTON(widget), "Calcular Hash (Actual)");
+      gtk_button_set_label(GTK_BUTTON(widget), "Calcular Hash");
     } else {
       // Verificar si los tipos MIME coinciden
       if (tipoMimeActual != *tipoMimeOriginal) {
@@ -202,7 +202,18 @@ static void calcular_hash(GtkWidget *widget, gpointer data) {
   }
 }
 
+// Función para cambiar el modo entre "original" y "modificado"
+static void cambiar_modo(GtkWidget *widget, gpointer data) {
+  bool *esModoOriginal = static_cast<bool*>(g_object_get_data(G_OBJECT(data), "esModoOriginal"));
+  *esModoOriginal = !(*esModoOriginal); // Cambiar el modo
 
+  GtkWidget *button = GTK_WIDGET(g_object_get_data(G_OBJECT(data), "button"));
+  if (*esModoOriginal) {
+    gtk_button_set_label(GTK_BUTTON(button), "Calcular Hash ");
+  } else {
+    gtk_button_set_label(GTK_BUTTON(button), "Calcular Hash ");
+  }
+}
 
 int main(int argc, char *argv[]) {
   gtk_init(&argc, &argv);
@@ -235,7 +246,6 @@ int main(int argc, char *argv[]) {
   gtk_box_pack_start(GTK_BOX(vbox), button, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 
-  
 
   // Inicializar la variable primerHash, hashOriginal y tipoMimeOriginal en la ventana
   bool primerHash = false;
