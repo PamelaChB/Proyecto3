@@ -132,7 +132,7 @@ string extraerContenido(const string &nombreArchivo) {
       cerr << "Error al abrir el archivo de texto." << endl;
     }
   } else {
-    cout << "Formato de archivo no soportado." << endl;
+    cout << "Formato de archivo no soportado o archivo no encontrado" << endl;
   }
 
   magic_close(magic_cookie);
@@ -143,9 +143,11 @@ static void calcular_hash(GtkWidget *widget, gpointer data) {
   GtkWidget *entry = GTK_WIDGET(g_object_get_data(G_OBJECT(data), "entry"));
   const gchar *nombreArchivo = gtk_entry_get_text(GTK_ENTRY(entry));
 
-  // Obtener el hash original y la variable primerHash almacenados en la ventana
+  // Obtener el hash original, la variable primerHash y el tipo MIME original
   string *hashOriginal = static_cast<string*>(g_object_get_data(G_OBJECT(data), "hashOriginal"));
   bool *primerHash = static_cast<bool*>(g_object_get_data(G_OBJECT(data), "primerHash"));
+  string *tipoMimeOriginal = static_cast<string*>(g_object_get_data(G_OBJECT(data), "tipoMimeOriginal"));
+  bool *esModoOriginal = static_cast<bool*>(g_object_get_data(G_OBJECT(data), "esModoOriginal"));
 
   string contenido = extraerContenido(nombreArchivo);
   if (!contenido.empty()) {
@@ -162,28 +164,45 @@ static void calcular_hash(GtkWidget *widget, gpointer data) {
     std::filesystem::path path(nombreArchivo);
     double size = std::filesystem::file_size(path) / 1024.0; // Tamaño en KB
 
+    // Obtener el tipo MIME del archivo actual
+    magic_t magic_cookie = magic_open(MAGIC_MIME_TYPE);
+    magic_load(magic_cookie, NULL);
+    const char *mime_type = magic_file(magic_cookie, nombreArchivo);
+    string tipoMimeActual(mime_type);
+    magic_close(magic_cookie);
+
     // Mostrar el hash, tamaño, tiempo y estado en la etiqueta
     GtkWidget *label = GTK_WIDGET(g_object_get_data(G_OBJECT(data), "etiquetaHash"));
     string resultado = "Hash: " + hash + "\n";
     resultado += "Tamaño: " + to_string(size) + " KB\n";
     resultado += "Tiempo: " + to_string(duracion.count()) + " ms\n";
 
-    if (!*primerHash) {
+    if (*esModoOriginal) {
       resultado += "Estado: Original\n";
       *hashOriginal = hash; // Guardar el hash original
+      *tipoMimeOriginal = tipoMimeActual; // Guardar el tipo MIME original
       *primerHash = true;
+      gtk_button_set_label(GTK_BUTTON(widget), "Calcular Hash (Actual)");
     } else {
-      // Comparar el hash con el hash original
-      if (*hashOriginal == hash) {
-        resultado += "Estado: No modificado\n";
+      // Verificar si los tipos MIME coinciden
+      if (tipoMimeActual != *tipoMimeOriginal) {
+        resultado += "Estado: Los formatos de archivo no coinciden\n";
       } else {
-        resultado += "Estado: Modificado\n";
+        // Comparar el hash con el hash original
+        if (*hashOriginal == hash) {
+          resultado += "Estado: No modificado\n";
+        } else {
+          resultado += "Estado: Modificado\n";
+        }
       }
     }
 
     gtk_label_set_text(GTK_LABEL(label), resultado.c_str());
+    *esModoOriginal = !(*esModoOriginal); // Cambiar el modo
   }
 }
+
+
 
 int main(int argc, char *argv[]) {
   gtk_init(&argc, &argv);
@@ -193,6 +212,7 @@ int main(int argc, char *argv[]) {
   GtkWidget *entry;
   GtkWidget *label;
   GtkWidget *vbox;
+  GtkWidget *modoButton; // Botón para cambiar el modo
 
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   gtk_window_set_title(GTK_WINDOW(window), "Hash Checker");
@@ -202,8 +222,9 @@ int main(int argc, char *argv[]) {
   entry = gtk_entry_new();
   g_object_set_data(G_OBJECT(window), "entry", entry);
 
-  button = gtk_button_new_with_label("Calcular Hash");
+  button = gtk_button_new_with_label("Calcular Hash ");
   g_signal_connect(button, "clicked", G_CALLBACK(calcular_hash), window);
+  g_object_set_data(G_OBJECT(window), "button", button); // Guardar el botón
 
   label = gtk_label_new("Hash:");
   g_object_set_data(G_OBJECT(window), "etiquetaHash", label);
@@ -214,10 +235,17 @@ int main(int argc, char *argv[]) {
   gtk_box_pack_start(GTK_BOX(vbox), button, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 
-  // Inicializar la variable primerHash y hashOriginal en la ventana
+  
+
+  // Inicializar la variable primerHash, hashOriginal y tipoMimeOriginal en la ventana
   bool primerHash = false;
   g_object_set_data(G_OBJECT(window), "primerHash", new bool(primerHash));
-  g_object_set_data(G_OBJECT(window), "hashOriginal", new string("")); // Inicializar hashOriginal
+  g_object_set_data(G_OBJECT(window), "hashOriginal", new string(""));
+  g_object_set_data(G_OBJECT(window), "tipoMimeOriginal", new string(""));
+
+  // Inicializar la variable esModoOriginal en la ventana
+  bool esModoOriginal = true;
+  g_object_set_data(G_OBJECT(window), "esModoOriginal", new bool(esModoOriginal));
 
   gtk_widget_show_all(window);
 
